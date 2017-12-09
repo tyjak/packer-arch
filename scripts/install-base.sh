@@ -9,10 +9,13 @@ else
 	DISK='/dev/sda'
 fi
 
+USERNAME=${VMUSERNAME:-vagrant}
+PUBKEY=${PUBKEY:-$(/usr/bin/curl -s --location https://raw.github.com/mitchellh/vagrant/master/keys/vagrant.pub)}
+
 FQDN='vagrant-arch.vagrantup.com'
-KEYMAP='us'
-LANGUAGE='en_US.UTF-8'
-PASSWORD=$(/usr/bin/openssl passwd -crypt 'vagrant')
+KEYMAP=${KEYMAP:-us}
+LANGUAGE=${LANGUAGE:-en_US.UTF-8}
+PASSWORD=$(/usr/bin/openssl passwd -crypt "${VMPASSWORD:-vagrant}")
 TIMEZONE='UTC'
 
 CONFIG_SCRIPT='/usr/local/bin/arch-config.sh'
@@ -20,6 +23,24 @@ ROOT_PARTITION="${DISK}1"
 TARGET_DIR='/mnt'
 COUNTRY=${COUNTRY:-US}
 MIRRORLIST="https://www.archlinux.org/mirrorlist/?country=${COUNTRY}&protocol=http&protocol=https&ip_version=4&use_mirror_status=on"
+
+cat <<-EOF
+==> Vars list :
+USERNAME=$USERNAME
+PUBKEY=$PUBKEY
+
+FQDN=$FQDN
+KEYMAP=$KEYMAP
+LANGUAGE=$LANGUAGE
+PASSWORD=$PASSWORD
+TIMEZONE=$TIMEZONE
+
+CONFIG_SCRIPT=$CONFIG_SCRIPT
+ROOT_PARTITION=$ROOT_PARTITION
+TARGET_DIR=$TARGET_DIR
+COUNTRY=$COUNTRY
+MIRRORLIST=$MIRRORLIST
+EOF
 
 echo "==> Setting local mirror"
 curl -s "$MIRRORLIST" |  sed 's/^#Server/Server/' > /etc/pacman.d/mirrorlist
@@ -71,14 +92,15 @@ cat <<-EOF > "${TARGET_DIR}${CONFIG_SCRIPT}"
 	/usr/bin/systemctl enable sshd.service
 
 	# Vagrant-specific configuration
-	/usr/bin/useradd --password ${PASSWORD} --comment 'Vagrant User' --create-home --user-group vagrant
-	echo 'Defaults env_keep += "SSH_AUTH_SOCK"' > /etc/sudoers.d/10_vagrant
-	echo 'vagrant ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers.d/10_vagrant
-	/usr/bin/chmod 0440 /etc/sudoers.d/10_vagrant
-	/usr/bin/install --directory --owner=vagrant --group=vagrant --mode=0700 /home/vagrant/.ssh
-	/usr/bin/curl --output /home/vagrant/.ssh/authorized_keys --location https://raw.github.com/mitchellh/vagrant/master/keys/vagrant.pub
-	/usr/bin/chown vagrant:vagrant /home/vagrant/.ssh/authorized_keys
-	/usr/bin/chmod 0600 /home/vagrant/.ssh/authorized_keys
+	/usr/bin/useradd --password ${PASSWORD} --comment 'User' --create-home --user-group ${USERNAME}
+	echo 'Defaults env_keep += "SSH_AUTH_SOCK"' > /etc/sudoers.d/10_${USERNAME}
+	echo '${USERNAME} ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers.d/10_${USERNAME}
+	/usr/bin/chmod 0440 /etc/sudoers.d/10_${USERNAME}
+	/usr/bin/install --directory --owner=${USERNAME} --group=${USERNAME} --mode=0700 /home/${USERNAME}/.ssh
+	#/usr/bin/curl --output /home/${USERNAME}/.ssh/authorized_keys --location ${PUBKEY}
+    /usr/bin/echo "${PUBKEY}" > /home/${USERNAME}/.ssh/authorized_keys
+	/usr/bin/chown ${USERNAME}:${USERNAME} /home/${USERNAME}/.ssh/authorized_keys
+	/usr/bin/chmod 0600 /home/${USERNAME}/.ssh/authorized_keys
 
 	# clean up
 	/usr/bin/pacman -Rcns --noconfirm gptfdisk
